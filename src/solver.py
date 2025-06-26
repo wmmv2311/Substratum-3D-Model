@@ -30,28 +30,28 @@ def solve_poisson_3d_fft(rho_grid, grid_step):
     return potential_real
 
 
-def solve_phi_field_3d_relax(U_bar, grid, tol=1e-5, max_iter=1000, omega=1.8):
+def solve_phi_field_3d_relax(U_bar, grid_info, tol=1e-5, max_iter=1000, omega=1.8):
     """
     Solves the 3D Klein-Gordon-like equation for the Φ field using the
     Successive Over-Relaxation (SOR) method. CORRECTED IMPLEMENTATION.
     """
     print("Solving 3D equation for Φ field using SOR method...")
     
-    grid_step = grid['step']
+    grid_step = grid_info['step']
     m_eff_sq = const.M0_SQ_EFF - 2 * const.BETA_SH_UNIVERSAL * U_bar
     m_eff_sq[m_eff_sq < 0] = 1e-6 
 
     # A better initial guess: a field that decays from the center
-    X, Y, Z = grid['X'], grid['Y'], grid['Z']
+    X, Y, Z = grid_info['X'], grid_info['Y'], grid_info['Z']
     r = np.sqrt(X**2 + Y**2 + Z**2)
-    phi = np.exp(-r / 5.0) # An exponential decay is a good start
+    phi = np.exp(-r / 5.0)
 
     h_sq = grid_step**2
     
     for it in range(max_iter):
         phi_old_max = np.max(phi)
         
-        # We must enforce boundary conditions: phi must be zero at the edges
+        # Enforce boundary conditions: phi must be zero at the edges
         phi[0, :, :] = phi[-1, :, :] = 0
         phi[:, 0, :] = phi[:, -1, :] = 0
         phi[:, :, 0] = phi[:, :, -1] = 0
@@ -61,24 +61,15 @@ def solve_phi_field_3d_relax(U_bar, grid, tol=1e-5, max_iter=1000, omega=1.8):
             for j in range(1, phi.shape[1] - 1):
                 for k in range(1, phi.shape[2] - 1):
                     
-                    # Correct update formula for the SOR method applied to our equation
-                    # We are solving: (∇² - m_eff²)Φ = 0
-                    
-                    # Sum of neighbors' values
                     neighbors_sum = (phi[i+1, j, k] + phi[i-1, j, k] +
                                      phi[i, j+1, k] + phi[i, j-1, k] +
                                      phi[i, j, k+1] + phi[i, j, k-1])
                     
-                    # Current value of phi at (i,j,k)
                     phi_old_ijk = phi[i, j, k]
                     
-                    # This is the core of the correction
-                    # The update moves the current value towards the average of its neighbors,
-                    # adjusted by the mass term.
                     term1 = 1.0 / (6.0 + h_sq * m_eff_sq[i, j, k])
                     term2 = neighbors_sum
                     
-                    # Apply the over-relaxation formula
                     phi_new = (1 - omega) * phi_old_ijk + omega * (term1 * term2)
                     phi[i, j, k] = phi_new
 
